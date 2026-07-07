@@ -225,8 +225,7 @@ function App() {
 
         <aside className="panel inquiry-panel" aria-labelledby="inquiry-title">
           <div className="question-card">
-            <p className="panel-kicker">탐구 질문</p>
-            <h2 id="inquiry-title">생각 정리하기</h2>
+            <h2 id="inquiry-title">탐구 질문</h2>
             <label htmlFor="student-note">
               표를 보고 발견한 점이나 궁금한 점을 자유롭게 적어 봅시다.
             </label>
@@ -237,7 +236,7 @@ function App() {
               placeholder="예: 꼭짓점이 늘어날수록 대각선도 더 빨리 늘어나는 것 같아요."
             />
             <button type="button" className="primary-button" onClick={() => setShowHint(true)}>
-              생각을 넓혀 보기
+              다음 질문
             </button>
             {showHint && (
               <p className="hint" aria-live="polite">
