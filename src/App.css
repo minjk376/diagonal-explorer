@@ -398,12 +398,13 @@ tbody tr:last-child td {
 
 .inquiry-panel {
   background: linear-gradient(180deg, #ffffff, #fbfaff);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .question-card {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -424,7 +425,7 @@ tbody tr:last-child td {
 }
 
 textarea {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 120px;
   resize: vertical;
   border: 1px solid #dbe2f2;
@@ -442,7 +443,7 @@ textarea::placeholder {
 }
 
 .primary-button {
-  margin-top: 12px;
+  margin-top: 10px;
   padding: 12px 16px;
   color: #ffffff;
   background: linear-gradient(135deg, #2563eb, #7c3aed);
@@ -451,14 +452,111 @@ textarea::placeholder {
   flex: 0 0 auto;
 }
 
+.secondary-note-button {
+  flex: 0 0 auto;
+  margin-top: 10px;
+  border: 1px solid #b9d4ff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 0.98rem;
+}
+
+.secondary-note-button:hover {
+  background: #dbeafe;
+}
+
 .hint {
-  margin: 12px 0 0;
+  flex: 0 0 auto;
+  margin: 10px 0 0;
   border-left: 4px solid #7c3aed;
   border-radius: 8px;
   padding: 12px 14px;
   color: #47318f;
   background: #f5f0ff;
   font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.records-section {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  margin-top: 12px;
+  border-top: 1px solid #e8edf7;
+  padding-top: 10px;
+}
+
+.records-section h3 {
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  color: #172033;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.records-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.record-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+  border: 1px solid #e8edf7;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #ffffff;
+}
+
+.record-item + .record-item {
+  margin-top: 8px;
+}
+
+.record-item p {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px;
+  margin: 0;
+  color: #27334a;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.record-item span {
+  color: #2563eb;
+}
+
+.record-item button {
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #b91c1c;
+  background: #fff5f5;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.record-item button:hover {
+  background: #fee2e2;
+}
+
+.empty-records {
+  margin: 0;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 12px;
+  color: #64748b;
+  background: #f8fafc;
+  font-size: 0.95rem;
   font-weight: 800;
   line-height: 1.35;
 }

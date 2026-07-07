@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const POLYGONS = [4, 5, 6, 7]
@@ -15,6 +15,20 @@ const NEW_VERTEX_OUTSET_STEPS = [32, 42, 54, 66]
 const MIN_VERTEX_DISTANCE = 24
 const MIN_CORNER_HEIGHT = 18
 const SVG_SAFE_PADDING = 22
+const GENERAL_EXPLORATION_PROMPTS = [
+  '꼭짓점을 한 개 추가했을 때 새로 생긴 초록색 대각선은 몇 개인가요?',
+  '꼭짓점이 한 개 늘어날 때마다 대각선은 몇 개씩 늘어나나요?',
+  '대각선 개수 표를 모두 채워 봅시다. 어떤 규칙이 보이나요?',
+  '다음 다각형의 대각선 개수는 몇 개일지 예상해 볼까요?',
+]
+const ONE_VERTEX_PROMPTS = [
+  '한 꼭짓점에서 그을 수 있는 대각선은 몇 개인가요?',
+  '한 꼭짓점에서 그을 수 있는 대각선 수와 전체 꼭짓점 수는 어떤 관계가 있을까요?',
+  '같은 대각선을 두 번 세지 않으려면 어떻게 해야 할까요?',
+  '백각형의 대각선 개수를 하나씩 그리지 않고 구할 수 있을까요?',
+]
+const EXPLORATION_RECORDS_STORAGE_KEY = 'diagonal-explorer-records'
+const CIRCLED_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩']
 
 function getVertices(sides) {
   const radius = 130
@@ -194,8 +208,22 @@ function App() {
   const [observationVertexId, setObservationVertexId] = useState(null)
   const [completedCounts, setCompletedCounts] = useState({})
   const [feedback, setFeedback] = useState('꼭짓점 두 개를 차례로 선택해 보세요.')
-  const [showHint, setShowHint] = useState(false)
+  const [explorationPrompt, setExplorationPrompt] = useState('')
+  const [promptIndexByMode, setPromptIndexByMode] = useState({
+    general: 0,
+    oneVertex: 0,
+  })
   const [note, setNote] = useState('')
+  const [explorationRecords, setExplorationRecords] = useState(() => {
+    try {
+      const savedRecords = window.localStorage.getItem(EXPLORATION_RECORDS_STORAGE_KEY)
+      const parsedRecords = savedRecords ? JSON.parse(savedRecords) : []
+
+      return Array.isArray(parsedRecords) ? parsedRecords : []
+    } catch {
+      return []
+    }
+  })
 
   const vertices = useMemo(
     () => polygonVertices[selectedSides] ?? getVertices(selectedSides),
@@ -211,6 +239,47 @@ function App() {
   const canAddVertex = currentCount === totalCount && totalCount > 0 && vertices.length < MAX_POLYGON_SIDES
   const canObserveOneVertex = currentCount === totalCount && totalCount > 0
   const isObservingOneVertex = observationVertexId !== null
+  const currentPromptMode = isObservingOneVertex ? 'oneVertex' : 'general'
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(EXPLORATION_RECORDS_STORAGE_KEY, JSON.stringify(explorationRecords))
+    } catch {
+      // Keep the note list usable even when localStorage is unavailable.
+    }
+  }, [explorationRecords])
+
+  function showNextExplorationPrompt() {
+    const prompts = isObservingOneVertex ? ONE_VERTEX_PROMPTS : GENERAL_EXPLORATION_PROMPTS
+    const currentIndex = promptIndexByMode[currentPromptMode]
+
+    setExplorationPrompt(prompts[currentIndex])
+    setPromptIndexByMode((previous) => ({
+      ...previous,
+      [currentPromptMode]: (currentIndex + 1) % prompts.length,
+    }))
+  }
+
+  function addExplorationRecord() {
+    const trimmedNote = note.trim()
+
+    if (!trimmedNote) {
+      return
+    }
+
+    setExplorationRecords((previous) => [
+      ...previous,
+      {
+        id: Date.now(),
+        text: trimmedNote,
+      },
+    ])
+    setNote('')
+  }
+
+  function deleteExplorationRecord(recordId) {
+    setExplorationRecords((previous) => previous.filter((record) => record.id !== recordId))
+  }
 
   function changePolygon(sides) {
     setPolygonVertices((previous) => {
@@ -538,24 +607,49 @@ function App() {
 
         <aside className="panel inquiry-panel" aria-labelledby="inquiry-title">
           <div className="question-card">
-            <h2 id="inquiry-title">탐구 질문</h2>
+            <h2 id="inquiry-title">탐구 노트</h2>
             <label htmlFor="student-note">
-              표를 보고 발견한 점이나 궁금한 점을 자유롭게 적어 봅시다.
+              탐구하면서 발견한 점, 예상한 내용,
+              <br />
+              궁금한 점을 자유롭게 기록해 봅시다.
             </label>
             <textarea
               id="student-note"
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="예: 꼭짓점이 늘어날수록 대각선도 더 빨리 늘어나는 것 같아요."
+              placeholder="예: 초록색 대각선만 세면 규칙을 찾기 쉬울 것 같아요."
             />
-            <button type="button" className="primary-button" onClick={() => setShowHint(true)}>
-              다음 질문
+            <button type="button" className="secondary-note-button" onClick={addExplorationRecord}>
+              탐구 기록 추가
             </button>
-            {showHint && (
+            <button type="button" className="primary-button" onClick={showNextExplorationPrompt}>
+              다른 탐구 질문 보기
+            </button>
+            {explorationPrompt && (
               <p className="hint" aria-live="polite">
-                한 꼭짓점에만 집중해 보면 어떤 규칙이 보일까요?
+                {explorationPrompt}
               </p>
             )}
+            <section className="records-section" aria-label="탐구 기록">
+              <h3>탐구 기록</h3>
+              <div className="records-list">
+                {explorationRecords.length > 0 ? (
+                  explorationRecords.map((record, index) => (
+                    <article key={record.id} className="record-item">
+                      <p>
+                        <span>{CIRCLED_NUMBERS[index] ?? `${index + 1}.`}</span>
+                        {record.text}
+                      </p>
+                      <button type="button" onClick={() => deleteExplorationRecord(record.id)}>
+                        삭제
+                      </button>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-records">아직 저장한 탐구 기록이 없습니다.</p>
+                )}
+              </div>
+            </section>
           </div>
         </aside>
       </section>
