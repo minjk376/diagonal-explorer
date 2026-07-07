@@ -2,15 +2,21 @@ import { useMemo, useState } from 'react'
 import './App.css'
 
 const POLYGONS = [4, 5, 6, 7]
+const MAX_POLYGON_SIDES = Math.max(...POLYGONS)
 const POLYGON_NAMES = {
   4: '사각형',
   5: '오각형',
   6: '육각형',
   7: '칠각형',
 }
+const SVG_CENTER = 150
+const NEW_VERTEX_OUTSET = 32
+const NEW_VERTEX_OUTSET_STEPS = [32, 42, 54, 66]
+const MIN_VERTEX_DISTANCE = 24
+const MIN_CORNER_HEIGHT = 18
+const SVG_SAFE_PADDING = 22
 
 function getVertices(sides) {
-  const center = 150
   const radius = 130
   const startAngle = -Math.PI / 2
 
@@ -18,39 +24,186 @@ function getVertices(sides) {
     const angle = startAngle + (index * 2 * Math.PI) / sides
     return {
       id: index,
-      x: center + radius * Math.cos(angle),
-      y: center + radius * Math.sin(angle),
+      x: SVG_CENTER + radius * Math.cos(angle),
+      y: SVG_CENTER + radius * Math.sin(angle),
     }
   })
+}
+
+function getPolygonCenter(vertices) {
+  const total = vertices.reduce(
+    (sum, vertex) => ({
+      x: sum.x + vertex.x,
+      y: sum.y + vertex.y,
+    }),
+    { x: 0, y: 0 },
+  )
+
+  return {
+    x: total.x / vertices.length,
+    y: total.y / vertices.length,
+  }
+}
+
+function getDistance(first, second) {
+  return Math.hypot(first.x - second.x, first.y - second.y)
+}
+
+function getCornerHeight(left, middle, right) {
+  const baseLength = getDistance(left, right) || 1
+  const cross =
+    (middle.x - left.x) * (right.y - left.y) - (middle.y - left.y) * (right.x - left.x)
+
+  return Math.abs(cross) / baseLength
+}
+
+function getOutwardUnitVector(midpoint, center, edgeStart, edgeEnd) {
+  const outwardVector = {
+    x: midpoint.x - center.x,
+    y: midpoint.y - center.y,
+  }
+  const vectorLength = Math.hypot(outwardVector.x, outwardVector.y)
+
+  if (vectorLength > 0.001) {
+    return {
+      x: outwardVector.x / vectorLength,
+      y: outwardVector.y / vectorLength,
+    }
+  }
+
+  const edgeVector = {
+    x: edgeEnd.x - edgeStart.x,
+    y: edgeEnd.y - edgeStart.y,
+  }
+  const normal = {
+    x: -edgeVector.y,
+    y: edgeVector.x,
+  }
+  const normalLength = Math.hypot(normal.x, normal.y) || 1
+
+  return {
+    x: normal.x / normalLength,
+    y: normal.y / normalLength,
+  }
+}
+
+function getDistanceToSafeEdge(midpoint, unitVector) {
+  return Math.min(
+    unitVector.x > 0 ? (300 - SVG_SAFE_PADDING - midpoint.x) / unitVector.x : Infinity,
+    unitVector.x < 0 ? (SVG_SAFE_PADDING - midpoint.x) / unitVector.x : Infinity,
+    unitVector.y > 0 ? (300 - SVG_SAFE_PADDING - midpoint.y) / unitVector.y : Infinity,
+    unitVector.y < 0 ? (SVG_SAFE_PADDING - midpoint.y) / unitVector.y : Infinity,
+  )
+}
+
+function isSafeNewVertex(candidate, vertices, edgeStart, edgeEnd) {
+  const hasEnoughDistance = vertices.every((vertex) => getDistance(candidate, vertex) >= MIN_VERTEX_DISTANCE)
+  const hasCornerShape = getCornerHeight(edgeStart, candidate, edgeEnd) >= MIN_CORNER_HEIGHT
+
+  return hasEnoughDistance && hasCornerShape
+}
+
+function getCandidateVertex(edgeStart, edgeEnd, center, nextId, requestedOutset) {
+  const midpoint = {
+    x: (edgeStart.x + edgeEnd.x) / 2,
+    y: (edgeStart.y + edgeEnd.y) / 2,
+  }
+  const unitVector = getOutwardUnitVector(midpoint, center, edgeStart, edgeEnd)
+  const distanceToSafeEdge = getDistanceToSafeEdge(midpoint, unitVector)
+  const outset = Math.max(0, Math.min(requestedOutset, distanceToSafeEdge))
+
+  return {
+    id: nextId,
+    x: midpoint.x + unitVector.x * outset,
+    y: midpoint.y + unitVector.y * outset,
+  }
+}
+
+function addVertexOnLongestEdge(vertices) {
+  const center = getPolygonCenter(vertices)
+  const nextId = Math.max(...vertices.map((vertex) => vertex.id)) + 1
+  const rankedEdges = vertices
+    .map((vertex, index) => {
+      const nextIndex = (index + 1) % vertices.length
+      const nextVertex = vertices[nextIndex]
+
+      return {
+        startIndex: index,
+        endIndex: nextIndex,
+        start: vertex,
+        end: nextVertex,
+        length: getDistance(vertex, nextVertex),
+      }
+    })
+    .sort((first, second) => second.length - first.length)
+
+  for (const edge of rankedEdges) {
+    for (const outset of NEW_VERTEX_OUTSET_STEPS) {
+      const candidate = getCandidateVertex(edge.start, edge.end, center, nextId, outset)
+
+      if (isSafeNewVertex(candidate, vertices, edge.start, edge.end)) {
+        return [
+          ...vertices.slice(0, edge.startIndex + 1),
+          candidate,
+          ...vertices.slice(edge.startIndex + 1),
+        ]
+      }
+    }
+  }
+
+  const fallbackEdge = rankedEdges[0]
+  const fallback = getCandidateVertex(fallbackEdge.start, fallbackEdge.end, center, nextId, NEW_VERTEX_OUTSET)
+
+  return [
+    ...vertices.slice(0, fallbackEdge.startIndex + 1),
+    fallback,
+    ...vertices.slice(fallbackEdge.startIndex + 1),
+  ]
 }
 
 function getLineKey(a, b) {
   return [a, b].sort((left, right) => left - right).join('-')
 }
 
-function isSide(a, b, sides) {
-  const distance = Math.abs(a - b)
-  return distance === 1 || distance === sides - 1
+function isSide(a, b, vertices) {
+  const firstIndex = vertices.findIndex((vertex) => vertex.id === a)
+  const secondIndex = vertices.findIndex((vertex) => vertex.id === b)
+
+  if (firstIndex === -1 || secondIndex === -1) {
+    return false
+  }
+
+  const distance = Math.abs(firstIndex - secondIndex)
+  return distance === 1 || distance === vertices.length - 1
 }
 
-function diagonalCount(sides) {
-  return (sides * (sides - 3)) / 2
+function diagonalCount(vertexCount) {
+  return (vertexCount * (vertexCount - 3)) / 2
 }
 
 function App() {
   const [selectedSides, setSelectedSides] = useState(4)
+  const [polygonVertices, setPolygonVertices] = useState({})
   const [selectedVertex, setSelectedVertex] = useState(null)
   const [drawnDiagonals, setDrawnDiagonals] = useState({})
+  const [newDiagonalKeys, setNewDiagonalKeys] = useState({})
   const [completedCounts, setCompletedCounts] = useState({})
   const [feedback, setFeedback] = useState('꼭짓점 두 개를 차례로 선택해 보세요.')
   const [showHint, setShowHint] = useState(false)
   const [note, setNote] = useState('')
 
-  const vertices = useMemo(() => getVertices(selectedSides), [selectedSides])
+  const vertices = useMemo(
+    () => polygonVertices[selectedSides] ?? getVertices(selectedSides),
+    [polygonVertices, selectedSides],
+  )
   const polygonPoints = vertices.map((point) => `${point.x},${point.y}`).join(' ')
+  const vertexById = useMemo(() => new Map(vertices.map((vertex) => [vertex.id, vertex])), [vertices])
   const currentKeys = drawnDiagonals[selectedSides] ?? []
+  const currentNewKeys = newDiagonalKeys[selectedSides] ?? []
   const currentCount = currentKeys.length
-  const totalCount = diagonalCount(selectedSides)
+  const totalCount = diagonalCount(vertices.length)
+  const currentPolygonName = POLYGON_NAMES[vertices.length] ?? `${vertices.length}각형`
+  const canAddVertex = currentCount === totalCount && totalCount > 0 && vertices.length < MAX_POLYGON_SIDES
 
   function changePolygon(sides) {
     setSelectedSides(sides)
@@ -63,13 +216,42 @@ function App() {
       ...previous,
       [selectedSides]: [],
     }))
+    setNewDiagonalKeys((previous) => ({
+      ...previous,
+      [selectedSides]: [],
+    }))
     setCompletedCounts((previous) => {
       const next = { ...previous }
-      delete next[selectedSides]
+      delete next[vertices.length]
       return next
     })
     setSelectedVertex(null)
     setFeedback('초기화했어요. 다시 대각선을 찾아보세요.')
+  }
+
+  function addOneVertex() {
+    if (!canAddVertex) {
+      return
+    }
+
+    const nextVertices = addVertexOnLongestEdge(vertices)
+    const nextSides = nextVertices.length
+
+    setPolygonVertices((previous) => ({
+      ...previous,
+      [nextSides]: nextVertices,
+    }))
+    setDrawnDiagonals((previous) => ({
+      ...previous,
+      [nextSides]: currentKeys,
+    }))
+    setNewDiagonalKeys((previous) => ({
+      ...previous,
+      [nextSides]: [],
+    }))
+    setSelectedSides(nextSides)
+    setSelectedVertex(null)
+    setFeedback('새 꼭짓점이 추가되었습니다. 새롭게 필요한 대각선을 이어서 그려 보세요.')
   }
 
   function handleVertexClick(vertexId) {
@@ -85,7 +267,7 @@ function App() {
       return
     }
 
-    if (isSide(selectedVertex, vertexId, selectedSides)) {
+    if (isSide(selectedVertex, vertexId, vertices)) {
       setSelectedVertex(null)
       setFeedback('이 선분은 변이에요. 대각선이 아니에요.')
       return
@@ -103,13 +285,17 @@ function App() {
       ...previous,
       [selectedSides]: nextKeys,
     }))
+    setNewDiagonalKeys((previous) => ({
+      ...previous,
+      [selectedSides]: [...(previous[selectedSides] ?? []), nextKey],
+    }))
 
     if (nextKeys.length === totalCount) {
       setCompletedCounts((previous) => ({
         ...previous,
-        [selectedSides]: totalCount,
+        [vertices.length]: totalCount,
       }))
-      setFeedback(`${POLYGON_NAMES[selectedSides]}의 대각선은 모두 ${totalCount}개입니다.`)
+      setFeedback(`${currentPolygonName}의 대각선은 모두 ${totalCount}개입니다.`)
     } else {
       setFeedback('대각선을 추가했어요. 빠뜨린 대각선이 더 있는지 살펴보세요.')
     }
@@ -130,9 +316,19 @@ function App() {
               <h2 id="workspace-title">대각선 그리기</h2>
               <p>모든 대각선을 빠짐없이 찾아 그려 봅시다.</p>
             </div>
-            <button type="button" className="ghost-button" onClick={resetCurrentPolygon}>
-              초기화
-            </button>
+            <div className="panel-actions">
+              <button type="button" className="ghost-button" onClick={resetCurrentPolygon}>
+                초기화
+              </button>
+              <button
+                type="button"
+                className="ghost-button add-vertex-button"
+                onClick={addOneVertex}
+                disabled={!canAddVertex}
+              >
+                꼭짓점 한 개 추가
+              </button>
+            </div>
           </div>
 
           <div className="polygon-controls" aria-label="다각형 선택">
@@ -157,14 +353,25 @@ function App() {
               <polygon points={polygonPoints} className="polygon-shape" />
               {currentKeys.map((key) => {
                 const [start, end] = key.split('-').map(Number)
+                const startVertex = vertexById.get(start)
+                const endVertex = vertexById.get(end)
+
+                if (!startVertex || !endVertex) {
+                  return null
+                }
+
                 return (
                   <line
                     key={key}
-                    className="diagonal-line"
-                    x1={vertices[start].x}
-                    y1={vertices[start].y}
-                    x2={vertices[end].x}
-                    y2={vertices[end].y}
+                    className={
+                      currentNewKeys.includes(key)
+                        ? 'diagonal-line new-diagonal-line'
+                        : 'diagonal-line existing-diagonal-line'
+                    }
+                    x1={startVertex.x}
+                    y1={startVertex.y}
+                    x2={endVertex.x}
+                    y2={endVertex.y}
                   />
                 )
               })}
@@ -214,7 +421,7 @@ function App() {
             </thead>
             <tbody>
               {POLYGONS.map((sides) => (
-                <tr key={sides} className={selectedSides === sides ? 'selected-row' : ''}>
+                <tr key={sides} className={vertices.length === sides ? 'selected-row' : ''}>
                   <td>{POLYGON_NAMES[sides]}</td>
                   <td>{completedCounts[sides] ?? '-'}</td>
                 </tr>

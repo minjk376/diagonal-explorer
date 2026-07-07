@@ -117,6 +117,32 @@ textarea:focus-visible {
   background: #f3f5ff;
 }
 
+.ghost-button:disabled {
+  color: #8b95aa;
+  background: #f2f5fb;
+  border-color: #e1e6f2;
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.add-vertex-button:not(:disabled) {
+  color: #047857;
+  border-color: #9be3c4;
+  background: #ecfdf5;
+}
+
+.add-vertex-button:not(:disabled):hover {
+  background: #d9fae8;
+}
+
 .polygon-controls {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -172,9 +198,17 @@ textarea:focus-visible {
 }
 
 .diagonal-line {
-  stroke: #8b5cf6;
+  stroke: #2563eb;
   stroke-width: 4.5;
   stroke-linecap: round;
+}
+
+.existing-diagonal-line {
+  stroke: #2563eb;
+}
+
+.new-diagonal-line {
+  stroke: #16a34a;
 }
 
 .vertex {
