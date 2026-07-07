@@ -181,12 +181,17 @@ function diagonalCount(vertexCount) {
   return (vertexCount * (vertexCount - 3)) / 2
 }
 
+function getDiagonalsFromOneVertexCount(vertexCount) {
+  return Math.max(0, vertexCount - 3)
+}
+
 function App() {
   const [selectedSides, setSelectedSides] = useState(4)
   const [polygonVertices, setPolygonVertices] = useState({})
   const [selectedVertex, setSelectedVertex] = useState(null)
   const [drawnDiagonals, setDrawnDiagonals] = useState({})
   const [newDiagonalKeys, setNewDiagonalKeys] = useState({})
+  const [observationVertexId, setObservationVertexId] = useState(null)
   const [completedCounts, setCompletedCounts] = useState({})
   const [feedback, setFeedback] = useState('꼭짓점 두 개를 차례로 선택해 보세요.')
   const [showHint, setShowHint] = useState(false)
@@ -204,10 +209,26 @@ function App() {
   const totalCount = diagonalCount(vertices.length)
   const currentPolygonName = POLYGON_NAMES[vertices.length] ?? `${vertices.length}각형`
   const canAddVertex = currentCount === totalCount && totalCount > 0 && vertices.length < MAX_POLYGON_SIDES
+  const canObserveOneVertex = currentCount === totalCount && totalCount > 0
+  const isObservingOneVertex = observationVertexId !== null
 
   function changePolygon(sides) {
+    setPolygonVertices((previous) => {
+      const next = { ...previous }
+      delete next[sides]
+      return next
+    })
+    setDrawnDiagonals((previous) => ({
+      ...previous,
+      [sides]: [],
+    }))
+    setNewDiagonalKeys((previous) => ({
+      ...previous,
+      [sides]: [],
+    }))
     setSelectedSides(sides)
     setSelectedVertex(null)
+    setObservationVertexId(null)
     setFeedback('꼭짓점 두 개를 차례로 선택해 보세요.')
   }
 
@@ -226,6 +247,7 @@ function App() {
       return next
     })
     setSelectedVertex(null)
+    setObservationVertexId(null)
     setFeedback('초기화했어요. 다시 대각선을 찾아보세요.')
   }
 
@@ -251,7 +273,43 @@ function App() {
     }))
     setSelectedSides(nextSides)
     setSelectedVertex(null)
+    setObservationVertexId(null)
     setFeedback('새 꼭짓점이 추가되었습니다. 새롭게 필요한 대각선을 이어서 그려 보세요.')
+  }
+
+  function showOneVertex() {
+    if (!canObserveOneVertex) {
+      return
+    }
+
+    const firstVertexId = vertices[0].id
+    setSelectedVertex(null)
+    setObservationVertexId(firstVertexId)
+    setFeedback(
+      `${firstVertexId + 1}번 꼭짓점에서 그을 수 있는 대각선은 ${getDiagonalsFromOneVertexCount(
+        vertices.length,
+      )}개입니다.`,
+    )
+  }
+
+  function showNextVertex() {
+    if (!isObservingOneVertex) {
+      return
+    }
+
+    const currentIndex = vertices.findIndex((vertex) => vertex.id === observationVertexId)
+    const nextVertex = vertices[(currentIndex + 1) % vertices.length]
+    setObservationVertexId(nextVertex.id)
+    setFeedback(
+      `${nextVertex.id + 1}번 꼭짓점에서 그을 수 있는 대각선은 ${getDiagonalsFromOneVertexCount(
+        vertices.length,
+      )}개입니다.`,
+    )
+  }
+
+  function closeOneVertexView() {
+    setObservationVertexId(null)
+    setFeedback(`${currentPolygonName}의 대각선을 모두 함께 살펴보세요.`)
   }
 
   function handleVertexClick(vertexId) {
@@ -344,6 +402,39 @@ function App() {
             ))}
           </div>
 
+          <div className="view-controls" aria-label="보기 방식">
+            <div className="view-toggle" role="group">
+              <button
+                type="button"
+                className={!isObservingOneVertex ? 'active' : ''}
+                onClick={() => {
+                  if (isObservingOneVertex) {
+                    closeOneVertexView()
+                  }
+                }}
+              >
+                전체 보기
+              </button>
+              <button
+                type="button"
+                className={isObservingOneVertex ? 'active' : ''}
+                onClick={() => {
+                  if (!isObservingOneVertex) {
+                    showOneVertex()
+                  }
+                }}
+                disabled={!canObserveOneVertex}
+              >
+                한 꼭짓점 보기
+              </button>
+            </div>
+            {isObservingOneVertex && (
+              <button type="button" className="next-view-button" onClick={showNextVertex}>
+                다른 꼭짓점 보기
+              </button>
+            )}
+          </div>
+
           <div className="svg-frame">
             <svg
               viewBox="0 0 300 300"
@@ -355,6 +446,8 @@ function App() {
                 const [start, end] = key.split('-').map(Number)
                 const startVertex = vertexById.get(start)
                 const endVertex = vertexById.get(end)
+                const isObservedDiagonal =
+                  isObservingOneVertex && (start === observationVertexId || end === observationVertexId)
 
                 if (!startVertex || !endVertex) {
                   return null
@@ -364,9 +457,13 @@ function App() {
                   <line
                     key={key}
                     className={
-                      currentNewKeys.includes(key)
-                        ? 'diagonal-line new-diagonal-line'
-                        : 'diagonal-line existing-diagonal-line'
+                      [
+                        'diagonal-line',
+                        currentNewKeys.includes(key) ? 'new-diagonal-line' : 'existing-diagonal-line',
+                        isObservingOneVertex && (isObservedDiagonal ? 'observed-diagonal-line' : 'dimmed-diagonal-line'),
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
                     }
                     x1={startVertex.x}
                     y1={startVertex.y}
@@ -376,7 +473,16 @@ function App() {
                 )
               })}
               {vertices.map((vertex) => (
-                <g key={vertex.id}>
+                <g
+                  key={vertex.id}
+                  className={
+                    isObservingOneVertex
+                      ? vertex.id === observationVertexId
+                        ? 'observed-vertex-group'
+                        : 'dimmed-vertex-group'
+                      : undefined
+                  }
+                >
                   <circle
                     className={selectedVertex === vertex.id ? 'vertex selected' : 'vertex'}
                     cx={vertex.x}

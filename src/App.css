@@ -107,10 +107,10 @@ textarea:focus-visible {
 
 .ghost-button {
   border: 1px solid #cfd7ff;
-  padding: 9px 14px;
+  padding: 8px 12px;
   color: #4c43cf;
   background: #ffffff;
-  font-size: 0.98rem;
+  font-size: 0.94rem;
 }
 
 .ghost-button:hover {
@@ -147,16 +147,16 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 7px;
   flex: 0 0 auto;
 }
 
 .polygon-controls button {
   border: 1px solid #dce2f1;
-  padding: 10px 8px;
+  padding: 8px;
   color: #46546f;
   background: #f8faff;
-  font-size: 1rem;
+  font-size: 0.96rem;
 }
 
 .polygon-controls button.active {
@@ -164,6 +164,56 @@ textarea:focus-visible {
   color: #ffffff;
   background: linear-gradient(135deg, #2563eb, #7c3aed);
   box-shadow: 0 10px 22px rgba(86, 72, 217, 0.25);
+}
+
+.view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex: 0 0 auto;
+}
+
+.view-toggle {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #dce2f1;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.view-toggle button,
+.next-view-button {
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #526079;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.view-toggle button.active {
+  color: #ffffff;
+  background: #2563eb;
+}
+
+.view-toggle button:disabled {
+  color: #a3adc0;
+  background: transparent;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.next-view-button {
+  border: 1px solid #fed7aa;
+  color: #7c2d12;
+  background: #fff7ed;
+}
+
+.next-view-button:hover {
+  background: #ffedd5;
 }
 
 .svg-frame {
@@ -211,6 +261,15 @@ textarea:focus-visible {
   stroke: #16a34a;
 }
 
+.observed-diagonal-line {
+  opacity: 1;
+  stroke-width: 6.5;
+}
+
+.dimmed-diagonal-line {
+  opacity: 0.16;
+}
+
 .vertex {
   fill: #ffffff;
   stroke: #2563eb;
@@ -235,6 +294,20 @@ textarea:focus-visible {
 .vertex.selected + .vertex-label,
 .vertex:hover + .vertex-label {
   fill: #ffffff;
+}
+
+.observed-vertex-group .vertex {
+  fill: #f97316;
+  stroke: #9a3412;
+  stroke-width: 5.5;
+}
+
+.observed-vertex-group .vertex-label {
+  fill: #ffffff;
+}
+
+.dimmed-vertex-group {
+  opacity: 0.22;
 }
 
 .status-row {
